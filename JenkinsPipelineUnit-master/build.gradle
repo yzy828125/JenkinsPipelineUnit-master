@@ -1,0 +1,153 @@
+import com.lesfurets.gradle.*
+
+plugins {
+    id 'com.jfrog.artifactory' version '5.2.5'
+    id 'groovy'
+    id 'maven-publish'
+    id 'java-library'
+    id 'jacoco'
+    id 'net.researchgate.release' version '3.0.2'
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://repo.jenkins-ci.org/public/' }
+}
+
+group = "com.lesfurets"
+archivesBaseName = "jenkins-pipeline-unit"
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+dependencies {
+    implementation('org.codehaus.groovy:groovy-all:2.4.21')
+    implementation('com.cloudbees:groovy-cps:3953.v19f11da_8d2fa_')
+    testImplementation('io.jenkins.plugins:pipeline-groovy-lib:740.va_2701257fe8d')
+    implementation('commons-io:commons-io:2.17.0')
+    implementation('org.apache.ivy:ivy:2.5.2')
+    api('org.assertj:assertj-core:3.26.3')
+    implementation('org.apache.commons:commons-lang3:3.17.0')
+
+    testImplementation('junit:junit:4.13.2')
+}
+
+defaultTasks 'test'
+
+tasks.register('javadocJar', Jar) {
+    archiveClassifier = 'javadoc'
+    from groovydoc
+}
+
+tasks.register('sourcesJar', Jar) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+test {
+
+    // Enable writing stacks with -Ppipeline.stack.write
+    if (project.hasProperty("pipeline.stack.write")) {
+        systemProperty "pipeline.stack.write", "true"
+    }
+
+    testLogging {
+        events "PASSED", "FAILED", "SKIPPED"
+    }
+}
+
+jacocoTestReport {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifact tasks.sourcesJar
+            artifact tasks.javadocJar
+            pom {
+                artifactId = "$project.archivesBaseName"
+                packaging = 'jar'
+                description = 'Jenkins Pipeline Unit testing framework'
+                url = 'https://github.com/jenkinsci/JenkinsPipelineUnit'
+
+                scm {
+                    url =  'https://github.com/jenkinsci/JenkinsPipelineUnit'
+                    connection = 'scm:git:git://github.com/jenkinsci/JenkinsPipelineUnit.git'
+                    developerConnection = 'scm:git:git@github.com/jenkinsci/JenkinsPipelineUnit.git'
+                }
+
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'http://www.opensource.org/licenses/mit-license.php'
+                        distribution = 'repo'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'ozangunalp'
+                        name = 'Ozan Gunalp'
+                        email = 'ozangunalp@gmail.com'
+                        url = 'https://github.com/ozangunalp'
+                        organization = 'lesfurets.com'
+                        organizationUrl = 'https://github.com/lesfurets'
+                    }
+                    developer {
+                        id = 'EQuincerot'
+                        name = 'Emmanuel Quincerot'
+                        url = 'https://github.com/EQuincerot'
+                        organization = 'lesfurets.com'
+                        organizationUrl = 'https://github.com/lesfurets'
+                    }
+                    developer {
+                        name = 'Thomas du Boÿs'
+                        url = 'https://github.com/Skool'
+                        id = 'Skool'
+                        organization = 'lesfurets.com'
+                        organizationUrl = 'https://github.com/lesfurets'
+                    }
+                }
+            }
+        }
+    }
+}
+
+artifactory {
+    contextUrl = 'https://repo.jenkins-ci.org'
+    publish {
+        repository {
+            repoKey = project.version.toString().endsWith('-SNAPSHOT') ? 'snapshots' : 'releases'
+            username = "${artifactory_user}" // The publisher user name
+            password = "${artifactory_password}" // The publisher password
+        }
+        defaults {
+            // Reference to Gradle publications defined in the build script.
+            // This is how we tell the Artifactory Plugin which artifacts should be
+            // published to Artifactory.
+            publications('maven')
+            publishArtifacts = true
+            // Properties to be attached to the published artifacts.
+            properties = ['qa.level': 'basic', 'dev.team' : 'core']
+            // Publish generated POM files to Artifactory (true by default)
+            publishPom = true
+        }
+    }
+}
+
+release {
+    git {
+        // TODO: We can't set this like a normal property because of a bug in the release plugin.
+        // See: https://github.com/researchgate/gradle-release/issues/357
+        requireBranch.set('master')
+    }
+    tagTemplate = 'v$version' // single quotes are required
+    failOnCommitNeeded = false
+    failOnPublishNeeded = false
+    failOnUpdateNeeded = false
+}

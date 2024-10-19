@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+    stages {
+        stage('Example Build') {
+            steps {
+                echo 'Hello World'
+            }
+        }
+        stage('Example allOf expression') {
+            when {
+                allOf {
+                    expression {
+                        return env.SHOULD_EXECUTE == 'true'
+                    }
+                    expression {
+                        return env.SHOULD_ALSO_EXECUTE == 'true'
+                    }
+                }
+            }
+            steps {
+                echo 'Executing allOf with expression'
+            }
+        }
+        stage('Example allOf branches') { // Contrived example
+            when {
+                allOf {
+                    branch pattern: 'production', comparator: 'EQUALS'
+                    branch pattern: /^release\/[A-Z].[A-Z].[A-Z]$/, comparator: 'REGEXP'
+                    branch pattern: 'main-**', comparator: 'GLOB'
+                    branch 'feature/*'
+                }
+            }
+            steps {
+                echo 'Executing allOf with branches'
+            }
+        }
+        stage('Example allOf tags') { // Contrived example
+            when {
+                allOf {
+                    tag pattern: 'latest', comparator: 'EQUALS'
+                    tag pattern: /^release-[A-Z].[A-Z].[A-Z]$/, comparator: 'REGEXP'
+                    tag pattern: 'v-*', comparator: 'GLOB'
+                    tag 'version-*'
+                }
+            }
+            steps {
+                echo 'Executing allOf with tags'
+            }
+        }
+        stage('Example allOf changeRequests') {
+            when {
+                allOf {
+                    changeRequest target: 'develop'
+                    changeRequest branch: 'feature/*', comparator:'GLOB'
+                }
+            }
+            steps {
+                echo 'Executing allOf with changeRequest'
+            }
+        }
+    }
+}
